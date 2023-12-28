@@ -3,6 +3,10 @@ package main
 import "testing"
 
 func Test_readKeys(t *testing.T) {
+	if testing.Short() {
+		// our CI can't decrypt gpg keys
+		t.Skip("skipping readkeys in short mode")
+	}
 	type args struct {
 		keyFilePath string
 	}
