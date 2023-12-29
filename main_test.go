@@ -19,7 +19,6 @@ func Test_readKeys(t *testing.T) {
 		want    string
 		wantErr bool
 	}{
-		// TODO: Add test cases.
 		{
 			name:    "Read an existing valid key file",
 			args:    args{keyFilePath: "./testData/key.gpg"},
@@ -88,10 +87,10 @@ func Test_parseHightlightRes(t *testing.T) {
 				Count: 2,
 				Sources: []source{
 					{
-						Readable_title: "readable_title",
-						SourceUrl:      stringPtr("https://test.com/source"),
-						ImgUrl:         "https://test.com/img.png",
-						Category:       article,
+						Title:     "readable_title",
+						SourceUrl: stringPtr("https://test.com/source"),
+						ImgUrl:    "https://test.com/img.png",
+						Category:  article,
 						Highlights: []highlight{
 							{
 								Text: "highlight 1",
@@ -100,10 +99,10 @@ func Test_parseHightlightRes(t *testing.T) {
 						},
 					},
 					{
-						Readable_title: "readable_title",
-						SourceUrl:      nil,
-						ImgUrl:         "https://test.com/img.png",
-						Category:       book,
+						Title:     "readable_title",
+						SourceUrl: nil,
+						ImgUrl:    "https://test.com/img.png",
+						Category:  book,
 						Highlights: []highlight{
 							{
 								Text: "highlight 1",
@@ -137,4 +136,47 @@ func stringPtr(s string) *string {
 func bytePtr(s string) *[]byte {
 	data := []byte(s)
 	return &data
+}
+
+func Test_sanitizeFileName(t *testing.T) {
+	type args struct {
+		title string
+		ext   string
+	}
+	tests := []struct {
+		name string
+		args args
+		want string
+	}{
+		{
+			name: "title without any special characters",
+			args: args{title: "normal text 1", ext: "txt"},
+			want: "normal_text_1.txt",
+		},
+		{
+			name: "name too long",
+			args: args{title: repeatN("a", 300), ext: "txt"},
+			want: repeatN("a", 255) + ".txt",
+		},
+		{
+			name: "name with special characters",
+			args: args{title: "foo$ `bar`", ext: "txt"},
+			want: "foo___bar_.txt",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := sanitizeFileName(tt.args.title, tt.args.ext); got != tt.want {
+				t.Errorf("sanitizeFileName() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func repeatN(s string, n int) string {
+	var result string
+	for i := 0; i < n; i++ {
+		result += s
+	}
+	return result
 }

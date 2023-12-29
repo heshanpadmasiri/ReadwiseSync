@@ -3,17 +3,22 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"regexp"
 	"strings"
+	"text/template"
 )
 
 const (
 	keyFilePath = "./keys.gpg"
 	apiUrl      = "https://readwise.io/api/v2"
+	readwiseDir = "./readwise"
 )
 
 // TODO: may be move this to seperate file
@@ -30,7 +35,7 @@ type highlightRes struct {
 }
 
 type source struct {
-	Readable_title string
+	Title string `json:"readable_title"`
 	Category       category
 	SourceUrl      *string     `json:"source_url"`
 	ImgUrl         string      `json:"cover_image_url"`
@@ -56,7 +61,65 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Print(highlightRes)
+	for _, source := range highlightRes.Sources  {
+		if source.Highlights == nil || len(source.Highlights) == 0 {
+			continue
+		}
+		err = writeSource(source)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+}
+
+func orgTemplate() (*template.Template, error) {
+	orgTemplate := `#+title: {{.Title}}
+#+category: {{.Category}}
+* Highlights
+{{range .Highlights}}- {{.Text}} [[{{.Url}}][(ref)]]
+{{end}}
+* Source:
++ {{with .SourceUrl}}[[{{.}}][url]]{{else}}N/A{{end}}
+`
+	return template.New("orgTemplate").Parse(orgTemplate)
+}
+
+func writeSource(source source) error {
+	template, err := orgTemplate()
+	if err != nil {
+		return err
+	}
+	file, err := createOrgFile(readwiseDir, source)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	return writeWithTemplate(template, source, file)
+}
+
+func createOrgFile(rootDir string, src source) (*os.File, error) {
+	outputDirectory := filepath.Join(rootDir, string(src.Category))
+	err := os.MkdirAll(outputDirectory, os.ModePerm)
+	if err != nil {
+		return nil, err
+	}
+	outputFilePath := filepath.Join(outputDirectory, sanitizeFileName(src.Title, "org"))
+	return os.Create(outputFilePath)
+}
+
+func writeWithTemplate(template *template.Template, src source, writer io.Writer) error {
+	return template.Execute(writer, src)
+}
+
+func sanitizeFileName(title, ext string) string {
+	re := regexp.MustCompile(`[^a-zA-Z0-9._-]`)
+	sanitized := re.ReplaceAllString(title, "_")
+
+	if len(sanitized) > 255 {
+		sanitized = sanitized[:255]
+	}
+
+	return sanitized + "." + ext
 }
 
 func readKeys(keyFilePath string) (string, error) {
