@@ -61,11 +61,16 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	args := os.Args
+	rootDir := readwiseDir
+	if len(args) > 1 {
+		rootDir = args[1]
+	}
 	for _, source := range highlightRes.Sources  {
 		if source.Highlights == nil || len(source.Highlights) == 0 {
 			continue
 		}
-		err = writeSource(source)
+		err = writeSource(source, rootDir)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -84,12 +89,12 @@ func orgTemplate() (*template.Template, error) {
 	return template.New("orgTemplate").Parse(orgTemplate)
 }
 
-func writeSource(source source) error {
+func writeSource(source source, rootDir string) error {
 	template, err := orgTemplate()
 	if err != nil {
 		return err
 	}
-	file, err := createOrgFile(readwiseDir, source)
+	file, err := createOrgFile(rootDir, source)
 	if err != nil {
 		return err
 	}
