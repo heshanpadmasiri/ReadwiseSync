@@ -16,9 +16,9 @@ import (
 )
 
 const (
-	keyFilePath = "./keys.gpg"
+	defaultKeyPath = "./keys.gpg"
 	apiUrl      = "https://readwise.io/api/v2"
-	readwiseDir = "./readwise"
+	defaultReadwiseDir = "./readwise"
 )
 
 // TODO: may be move this to seperate file
@@ -48,8 +48,18 @@ type highlight struct {
 }
 
 func main() {
-	// TODO: make this possible to override using command line
-	key, err := readKeys(keyFilePath)
+	args := os.Args
+	rootDir := defaultReadwiseDir
+	keyfile := defaultKeyPath
+	if hasFlag(args, "--h") || hasFlag(args, "-help") {
+		fmt.Println("Usage readwiseSync [path_to_valut, path_to_key_file]")
+		return
+	}
+	if len(args) == 3 {
+		rootDir = args[1]
+		keyfile = args[2]
+	}
+	key, err := readKeys(keyfile)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -61,11 +71,6 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	args := os.Args
-	rootDir := readwiseDir
-	if len(args) > 1 {
-		rootDir = args[1]
-	}
 	for _, source := range highlightRes.Sources  {
 		if source.Highlights == nil || len(source.Highlights) == 0 {
 			continue
@@ -75,6 +80,15 @@ func main() {
 			log.Fatal(err)
 		}
 	}
+}
+
+func hasFlag(args []string, flag string) bool {
+	for _, each := range args {
+		if each == flag {
+			return true
+		}
+	}
+	return false
 }
 
 func orgTemplate() (*template.Template, error) {
