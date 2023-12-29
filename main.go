@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -15,17 +16,47 @@ const (
 	apiUrl      = "https://readwise.io/api/v2"
 )
 
+// TODO: may be move this to seperate file
+type category string
+
+const (
+	article category = "articles"
+	book    category = "books"
+)
+
+type highlightRes struct {
+	Count   int
+	Sources []source `json:"results"`
+}
+
+type source struct {
+	Readable_title string
+	Category       category
+	SourceUrl      *string     `json:"source_url"`
+	ImgUrl         string      `json:"cover_image_url"`
+	Highlights     []highlight `json:"highlights"`
+}
+
+type highlight struct {
+	Text string `json:"text"`
+	Url  string `json:"readwise_url"`
+}
+
 func main() {
 	// TODO: make this possible to override using command line
 	key, err := readKeys(keyFilePath)
 	if err != nil {
 		log.Fatal(err)
 	}
-	res, err := fetchHighlights(key);
+	data, err := fetchHighlights(key)
 	if err != nil {
-		log.Fatal(err);
+		log.Fatal(err)
 	}
-	fmt.Print(res)
+	highlightRes, err := parseHightlightRes(data)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Print(highlightRes)
 }
 
 func readKeys(keyFilePath string) (string, error) {
@@ -44,25 +75,34 @@ func readKeys(keyFilePath string) (string, error) {
 	return key, nil
 }
 
-func fetchHighlights(apiKey string) (string, error) {
+func fetchHighlights(apiKey string) (*[]byte, error) {
 	client := &http.Client{}
-	req, err := http.NewRequest("GET", apiUrl + "/export", nil)
+	req, err := http.NewRequest("GET", apiUrl+"/export", nil)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	req.Header.Set("Authorization", "Token "+apiKey)
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("fetch highlights failed with status: %s", resp.Status)
+		return nil, fmt.Errorf("fetch highlights failed with status: %s", resp.Status)
 	}
-	body, err := ioutil.ReadAll(resp.Body);
+	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return string(body), nil
+	return &body, nil
+}
+
+func parseHightlightRes(response *[]byte) (*highlightRes, error) {
+	var res highlightRes
+	err := json.Unmarshal(*response, &res)
+	if err != nil {
+		return nil, err
+	}
+	return &res, nil
 }
