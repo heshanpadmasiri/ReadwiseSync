@@ -16,9 +16,10 @@ import (
 )
 
 const (
-	defaultKeyPath = "./keys.gpg"
 	apiUrl      = "https://readwise.io/api/v2"
+	defaultKeyPath = "./keys.gpg"
 	defaultReadwiseDir = "./readwise"
+	defaultTemplate ="./template.org"
 )
 
 // TODO: may be move this to seperate file
@@ -71,11 +72,15 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	for _, source := range highlightRes.Sources  {
+    template, err := getTemplate(defaultTemplate)
+    if err != nil {
+        log.Fatal(err)
+    }
+	for _, source := range highlightRes.Sources {
 		if source.Highlights == nil || len(source.Highlights) == 0 {
 			continue
 		}
-		err = writeSource(source, rootDir)
+		err = writeSource(source, rootDir, template)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -91,23 +96,15 @@ func hasFlag(args []string, flag string) bool {
 	return false
 }
 
-func orgTemplate() (*template.Template, error) {
-	orgTemplate := `#+title: {{.Title}}
-#+category: {{.Category}}
-* Highlights
-{{range .Highlights}}- {{.Text}} [[{{.Url}}][(ref)]]
-{{end}}
-* Source:
-+ {{with .SourceUrl}}[[{{.}}][url]]{{else}}N/A{{end}}
-`
-	return template.New("orgTemplate").Parse(orgTemplate)
+func getTemplate(templatePath string) (*template.Template, error) {
+    tmpl, err := template.ParseFiles(templatePath)
+    if err != nil {
+        return nil, err
+    }
+    return tmpl, nil
 }
 
-func writeSource(source source, rootDir string) error {
-	template, err := orgTemplate()
-	if err != nil {
-		return err
-	}
+func writeSource(source source, rootDir string, template *template.Template) error {
 	file, err := createOrgFile(rootDir, source)
 	if err != nil {
 		return err
